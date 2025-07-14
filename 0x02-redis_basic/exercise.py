@@ -4,8 +4,35 @@ Module to define a Cache class for storing data in Redis.
 """
 
 import uuid
+import functools
 from typing import Callable, Optional, Union
 import redis
+
+def count_calls(method: Callable) -> Callable:
+    """Decorator to count how many times a method is called."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        key = method.__qualname__
+        self._redis.incr(key)           # pylint: disable=protected-access
+        return method(self, *args, **kwargs)
+    return wrapper
+
+def call_history(method: Callable) -> Callable:
+    """
+    Decorator to store the history of inputs and outputs for a function.
+    Stores inputs in <qualname>:inputs and outputs in <qualname>:outputs
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        input_key = f"{method.__qualname__}:inputs"
+        output_key = f"{method.__qualname__}:outputs"
+        # Store input arguments as a string in the inputs list
+        self._redis.rpush(input_key, str(args))     # pylint: disable=protected-access
+        # Call the actual method and store the output
+        output = method(self, *args, **kwargs)
+        self._redis.rpush(output_key, str(output))  # pylint: disable=protected-access
+        return output
+    return wrapper
 
 class Cache:
     """Cache class for storing data in Redis."""
@@ -15,6 +42,8 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb()
 
+    @count_calls
+    @call_history
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """
         Store data in Redis with a random key.
@@ -71,16 +100,20 @@ class Cache:
         """
         return self.get(key, fn=lambda d: int(d) if d else None)
 
-cache = Cache()
-
-TEST_CASES = {
-    b"foo": None,  # Should return bytes
-    123: int,      # Should return integer
-    "bar": lambda d: d.decode("utf-8")  # Should return string
-}
-
-for value, fn in TEST_CASES.items():
-    key = cache.store(value)
-    assert cache.get(key, fn=fn) == value
-
-   
+def replay(method: Callable):
+    """
+    Display the history of calls of a particular function.
+    Shows number of calls, inputs, and outputs.
+    """
+    redis_client = method.__self__._redis  # pylint: disable=protected-access
+    qualname = method.__qualname__
+    calls = redis_client.get(qualname)
+    try:
+        calls_count = int(calls.decode("utf-8")) if calls else 0
+    except Exception:
+        calls_count = 0
+    print(f"{qualname} was called {calls_count} times:")
+    inputs = redis_client.lrange(f"{qualname}:inputs", 0, -1)
+    outputs = redis_client.lrange(f"{qualname}:outputs", 0, -1)
+    for inp, outp in zip(inputs, outputs):
+        print(f"{qualname}(*{inp.decode('utf-8')}) -> {outp.decode('utf-8')}")
