@@ -40,6 +40,6 @@ def get_page(url: str) -> str:
     return response.text
 
 if __name__ == "__main__":
-    TEST_URL = "http://slowwly.robertomurray.co.uk"
+    TEST_URL = "http://slowwly.robertomurray.co.uk/delay/3000/url/https://www.example.com"
     print(get_page(TEST_URL))
     print("Access count:", int(redis_client.get(f"count:{TEST_URL}")))
