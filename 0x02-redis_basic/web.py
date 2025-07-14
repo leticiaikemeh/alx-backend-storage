@@ -36,10 +36,10 @@ def get_page(url: str) -> str:
     # Track count
     redis_client.incr(f"count:{url}")
     # Fetch page
-    response = requests.get(url, timeout=10)
+    response = requests.get(url)
     return response.text
 
 if __name__ == "__main__":
-    TEST_URL = "http://slowwly.robertomurray.co.uk/delay/3000/url/https://www.example.com"
+    TEST_URL = "http://slowwly.robertomurray.co.uk"
     print(get_page(TEST_URL))
     print("Access count:", int(redis_client.get(f"count:{TEST_URL}")))
