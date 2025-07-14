@@ -110,7 +110,7 @@ def replay(method: Callable):
     calls = redis_client.get(qualname)
     try:
         calls_count = int(calls.decode("utf-8")) if calls else 0
-    except Exception:
+    except(AttributeError, ValueError):
         calls_count = 0
     print(f"{qualname} was called {calls_count} times:")
     inputs = redis_client.lrange(f"{qualname}:inputs", 0, -1)
