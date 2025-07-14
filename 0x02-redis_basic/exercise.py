@@ -3,10 +3,9 @@
 Module to define a Cache class for storing data in Redis.
 """
 
-import redis
 import uuid
-from typing import Union
 from typing import Callable, Optional, Union
+import redis
 
 class Cache:
     """Cache class for storing data in Redis."""
